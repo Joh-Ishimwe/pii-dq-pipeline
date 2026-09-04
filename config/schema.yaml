@@ -1,0 +1,171 @@
+# Contract for customers_raw.csv.
+# Rules live here (not in Python) so a non-engineer can change them
+# without a code deploy. Every rule is also documentation.
+
+dataset: customers
+expected_columns:
+  - customer_id
+  - first_name
+  - last_name
+  - email
+  - phone
+  - date_of_birth
+  - address
+  - income
+  - account_status
+  - created_date
+
+columns:
+  customer_id:
+    type: integer
+    required: true
+    unique: true
+    min: 1
+    pii: none
+
+  first_name:
+    type: string
+    required: true
+    min_length: 2
+    max_length: 50
+    alphabetic: true
+    pii: direct
+
+  last_name:
+    type: string
+    required: true
+    min_length: 2
+    max_length: 50
+    alphabetic: true
+    pii: direct
+
+  email:
+    type: string
+    required: true
+    format: email
+    pii: direct
+
+  phone:
+    type: string
+    required: true
+    format: phone
+    pii: direct
+
+  date_of_birth:
+    type: date
+    required: true
+    date_format: "%Y-%m-%d"
+    max_age_years: 120
+    min_age_years: 18
+    pii: quasi          # not unique alone; identifying in combination
+
+  address:
+    type: string
+    required: true
+    min_length: 10
+    max_length: 200
+    pii: direct
+
+  income:
+    type: numeric
+    required: false
+    min: 0
+    max: 10000000
+    pii: sensitive      # financial data - high breach impact
+
+  account_status:
+    type: category
+    required: true
+    allowed: [active, inactive, suspended]
+    pii: none
+
+  created_date:
+    type: date
+    required: true
+    date_format: "%Y-%m-%d"
+    pii: none
+
+# Values that LOOK like data but mean "missing".
+# Profiling must count these as missing, or completeness is overstated.
+null_like_values: ["", " ", "NA", "N/A", "n/a", "null", "NULL", "None",
+                   "none", "-", "unknown", "UNKNOWN", "?"]
+
+# What should the pipeline DO when a check fails?
+#   warn       -> log it, let the row through
+#   quarantine -> divert this row to data/quarantine, keep processing the rest
+#   fail       -> stop the whole run, page a human
+# Set per check type here; override per column with `on_fail:` inside a column.
+severity:
+  missing_column: fail        # structural - nothing downstream can work
+  empty_dataset: fail
+  duplicate_key: quarantine   # deduplication fixes it; escalate only if it survives cleaning
+  required_missing: quarantine
+  required_missing_recorded: warn   # a KNOWN gap, deliberately recorded by cleaning
+  type_invalid: quarantine
+  range_invalid: quarantine
+  format_invalid: quarantine
+  length_invalid: warn
+  alphabetic_invalid: warn
+  category_invalid: quarantine
+  cross_field_invalid: quarantine
+  duplicate_row: warn         # de-duplication handles it in cleaning
+
+# If more than this share of rows fail, something is systemically broken
+# upstream and cleaning would just launder the corruption. Stop instead.
+max_quarantine_rate_pct: 40
+
+# ---------------------------------------------------------------------------
+# CLEANING POLICY
+# What to do about a missing value, decided PER COLUMN, because the right
+# answer depends on what the column is for - not on a global preference.
+#   drop_row    -> the record is useless without it
+#   placeholder -> substitute a value that is OBVIOUSLY not real
+#   flag        -> leave empty, add a boolean column recording the absence
+#   leave       -> genuinely optional, do nothing
+missing_strategy:
+  customer_id: drop_row      # no key = the row cannot be joined, updated or traced
+  first_name: placeholder    # "UNKNOWN" - keeps the record usable for ops
+  last_name: placeholder
+  email: flag                # never invent contact details; record the gap
+  phone: flag
+  date_of_birth: flag        # NEVER impute: a fake DOB drives age/eligibility logic
+  address: flag
+  income: flag               # NEVER impute: a fake income drives credit decisions
+  account_status: drop_row   # unknown status = unknown how to treat the customer
+  created_date: flag
+
+# Ambiguous dates like 05/06/1990 could be 5 June or 6 May. There is NO way to
+# tell from the value. This is a business decision that must be documented,
+# and every affected row must be counted and reported - never silently assumed.
+ambiguous_date_policy: day_first   # source system is EU-format per the vendor spec
+
+# Values that mean the same thing as an allowed category, written differently.
+category_synonyms:
+  account_status:
+    actv: active
+    act: active
+    a: active
+    inact: inactive
+    susp: suspended
+
+# ---------------------------------------------------------------------------
+# MASKING POLICY
+# Every rule here trades UTILITY for PRIVACY. The trade is stated explicitly
+# so the person approving it can see what analysis they are giving up.
+masking:
+  first_name:    {method: initial_only,  keep: 1}
+  last_name:     {method: initial_only,  keep: 1}
+  email:         {method: partial_email, keep: 1}
+  phone:         {method: partial_tail,  keep: 4}
+  date_of_birth: {method: year_only}
+  address:       {method: redact,        label: "[MASKED ADDRESS]"}
+  income:        {method: band,          width: 25000}
+  customer_id:   {method: pseudonymize}   # salted hash: joins survive, id does not
+
+# The salt makes the hash un-guessable. In production this comes from a secrets
+# manager (AWS Secrets Manager / KMS), NEVER from a file in the repo.
+# Anyone holding the salt can re-identify every customer_id by brute force.
+pseudonym_salt_env: PII_PSEUDONYM_SALT
+
+# Columns a masked extract must never contain at all.
+drop_on_export: []
