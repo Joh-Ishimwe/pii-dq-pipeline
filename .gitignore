@@ -1,0 +1,19 @@
+# NEVER commit raw data - it contains PII. Git history is permanent.
+data/raw/
+data/processed/
+logs/
+reports/
+
+# only synthetic, safe-to-share data may be committed
+!data/samples/
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+
+# masked_sample.txt contains UNMASKED example values as evidence - restricted
+reports/masked_sample.txt
+data/quarantine/
