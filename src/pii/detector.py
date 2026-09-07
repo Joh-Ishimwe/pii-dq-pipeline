@@ -71,9 +71,15 @@ CONTENT_DETECTORS: dict[str, re.Pattern] = {
         r"|\d{1,2}-[A-Za-z]{3}-\d{4})\b"
     ),
 
-    # street address: a number followed by words then a street-type token
+    # street address: a house number followed by a street name, then either
+    # a comma-separated locality ("123 Elm Mount, Kigali") or a recognized
+    # street-type token ("123 Elm Street"). The comma form is deliberately
+    # NOT a suffix whitelist - real-world street types are far too varied
+    # (Faker alone uses well over a hundred of them: Mount, Ways, Mission,
+    # Passage, Cove, ...) for an enumerated list to keep up.
     "address": re.compile(
-        r"\b\d{1,5}\s+[\w\s]{2,30}\b"
+        r"\b\d{1,6}\s+[\w'.-]+(?:\s+[\w'.-]+){0,4}\s*,\s*[A-Za-z][\w\s'-]{1,30}"
+        r"|\b\d{1,5}\s+[\w\s]{2,30}\b"
         r"(?:street|st|road|rd|avenue|ave|lane|ln|way|drive|dr|blvd)\b",
         re.IGNORECASE,
     ),
