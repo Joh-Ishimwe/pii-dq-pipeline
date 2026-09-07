@@ -3,6 +3,13 @@ Generates a deliberately messy `customers_raw.csv` for the DQ project.
 
 This file exists ONLY because we need synthetic data that is safe to commit.
 Never generate this from, or replace it with, real production data.
+
+Uses Faker for the underlying "clean" values (street addresses, raw phone
+digits, dates of birth, account-creation dates) so the base data is realistic
+and varied. The MESSINESS - missing values, inconsistent formats, invalid
+values, duplicates - is still injected deterministically (tied to the row
+index), because the data quality report and every downstream report quote
+exact defect counts.
 """
 
 import csv
@@ -10,7 +17,25 @@ import random
 from datetime import date, timedelta
 from pathlib import Path
 
-random.seed(11)  # reproducible: same messy file every run
+from faker import Faker
+
+SEED = 11
+random.seed(SEED)
+fake = Faker()
+fake.seed_instance(SEED)
+
+# Fixed, absolute date ranges - NOT "today" or "-Ny". Faker's relative anchors
+# (`end_date="today"`) would make this file's contents depend on the real
+# calendar date it happens to be regenerated on, breaking the one guarantee
+# this module makes: same seed -> same messy file, forever.
+DOB_START, DOB_END = date(1955, 1, 1), date(2015, 12, 31)     # spans ages
+                                                                # ~11-71 as of
+                                                                # "today" in this
+                                                                # dataset's fiction
+                                                                # - deliberately
+                                                                # includes minors
+CREATED_START = date(2019, 1, 1)
+CREATED_END = CREATED_START + timedelta(days=2400)
 
 OUT = Path(__file__).resolve().parents[1] / "data" / "raw" / "customers_raw.csv"
 
@@ -20,8 +45,6 @@ FIRST = ["john", "MARY", "Kwame", "amina", "Grace", "peter", "Chidi", "Fatou",
 LAST = ["doe", "SMITH", "Mensah", "okafor", "Diallo", "brown", "Adeyemi",
         "Nkrumah", "williams", "Osei", "TRAORE", "Johnson", "Balogun",
         "keita", "Owusu", "Garcia", "abubakar", "Lee", "Sarr", "Mwangi"]
-STREETS = ["Main St", "Oak Avenue", "Independence Rd", "KG 11 Ave",
-           "Liberation Way", "Cedar Lane", "Airport Road", "Market Street"]
 CITIES = ["Kigali", "Accra", "Lagos", "Nairobi", "Dakar", "Kampala"]
 
 STATUS_POOL = (["active"] * 40 + ["inactive"] * 15 + ["suspended"] * 8
@@ -31,9 +54,13 @@ EMAIL_DOMAINS = ["gmail.com", "yahoo.com", "outlook.com", "company.co", "mail.rw
 
 
 def messy_phone(i: int) -> str:
-    """Same number, seven different human formats. This is a consistency defect."""
-    n = f"{random.randint(200, 989)}{random.randint(1000000, 9999999)}"
-    a, b, c = n[:3], n[3:6], n[6:10]
+    """A Faker-generated number, in seven different human formats. This is
+    a consistency defect - the underlying number is fine, the formatting isn't."""
+    # NANP-shaped: area code can't start 0/1. Faker gives us the raw digits;
+    # we just enforce that one real-world constraint.
+    digits = fake.numerify("#########")
+    a = str(random.randint(2, 9)) + digits[:2]
+    b, c = digits[2:5], digits[5:9]
     style = i % 8
     return [
         f"{a}-{b}-{c}",
@@ -47,8 +74,9 @@ def messy_phone(i: int) -> str:
     ][style]
 
 
-def messy_date(d: date, i: int) -> str:
-    """Same date, five different formats, plus junk. A validity + consistency defect."""
+def messy_date(d, i: int) -> str:
+    """A Faker-generated date, in five different formats, plus junk. A
+    validity + consistency defect."""
     style = i % 7
     if style == 5:
         return "invalid_date"
@@ -77,9 +105,15 @@ def messy_email(f: str, l: str, i: int) -> str:
     return f"{base}@{random.choice(EMAIL_DOMAINS)}"
 
 
+def messy_address(i: int) -> str:
+    """A Faker street address, paired with a curated city. Faker's own
+    'address' provider mixes in state/zip formats that don't fit a customer
+    record here, so we take just the street portion and build the rest ourselves."""
+    return f"{fake.street_address()}, {random.choice(CITIES)}"
+
+
 rows = []
 used_ids = []
-today = date(2026, 9, 1)
 
 for i in range(220):
     cid = 1000 + i
@@ -91,8 +125,8 @@ for i in range(220):
     f = random.choice(FIRST)
     l = random.choice(LAST)
 
-    dob = date(1955, 1, 1) + timedelta(days=random.randint(0, 60 * 365))
-    created = date(2019, 1, 1) + timedelta(days=random.randint(0, 2400))
+    dob = fake.date_between_dates(date_start=DOB_START, date_end=DOB_END)
+    created = fake.date_between_dates(date_start=CREATED_START, date_end=CREATED_END)
 
     # income defects
     r = random.random()
@@ -122,7 +156,7 @@ for i in range(220):
     elif i % 19 == 0:
         addr = "N/A"                   # short + a null-in-disguise
     else:
-        addr = f"{random.randint(1, 400)} {random.choice(STREETS)}, {random.choice(CITIES)}"
+        addr = messy_address(i)
 
     # a few impossible ages
     dob_out = messy_date(dob, i)
