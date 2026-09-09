@@ -91,7 +91,6 @@ def profile_column(series: pd.Series, name: str, rules: dict, null_like: set[str
         "whitespace_padded": sum(1 for v in present if v != v.strip()),
         "min_length": min((len(v) for v in present), default=0),
         "max_length": max((len(v) for v in present), default=0),
-        "top_values": Counter(present).most_common(5),
         "issues": [],
     }
 
@@ -352,6 +351,10 @@ def render_report(profile: dict) -> str:
     add("  VERDICT: this dataset is NOT fit for analysis or sharing in its raw")
     add("  state. It requires cleaning (see cleaning_log.txt) and PII masking")
     add("  (see pii_detection_report.txt) before any downstream use.")
+    add("")
+    add("  For value distributions, correlations and interactive exploration -")
+    add("  the generic statistics no contract check can express - see")
+    add("  reports/standard_profile.html (scripts/run_standard_profile.py).")
     add("")
 
     add(bar)
