@@ -24,6 +24,8 @@ See the docstring in that script for why both exist.
 
 ## Pipeline order
 
+![Pipeline architecture](docs/architecture.png)
+
 ```
 Load (as text) → Profile → Detect PII → Validate (measure)
               → Clean → Validate (prove) → Mask → Save + Report
@@ -59,7 +61,7 @@ config edit, not a code change.
 
 - `data/raw/` and `reports/masked_sample.txt` contain personal data and are
   gitignored. Keep them that way.
-- `customers_masked.csv` is **pseudonymized, not anonymized** — 71% of rows
+- `customers_masked.csv` is **pseudonymized, not anonymized** — 56.5% of rows
   remain uniquely identifiable on quasi-identifiers. GDPR still applies.
 - Without `PII_PSEUDONYM_SALT` set, pseudonyms are reversible by brute force.
   The pipeline warns; do not ignore it.
