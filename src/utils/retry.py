@@ -1,21 +1,9 @@
 """
-Retry with exponential backoff.
+Retry with exponential backoff + jitter.
 
-The only interesting decision in retry logic is WHAT NOT TO RETRY.
-
-  TRANSIENT  - the world was briefly broken. Timeouts, connection resets,
-               HTTP 500/502/503/504, a locked file, a rate limit.
-               -> retry. It will probably work in 4 seconds.
-
-  PERMANENT  - the request itself is wrong. HTTP 404, 400, 401, 403,
-               a missing file, a malformed CSV, a bad schema.
-               -> do NOT retry. Retrying a 404 five times just turns one
-                  fast failure into a slow one, and buries the real error.
-
-Backoff is exponential (1s, 2s, 4s, 8s) with JITTER - a small random offset.
-Without jitter, 200 pipelines that all failed at 03:00 all retry at 03:01
-simultaneously and knock the recovering service straight back over. This is
-called a thundering herd, and jitter is the one-line fix.
+TRANSIENT (timeouts, connection resets, a locked file) -> retry.
+PERMANENT (missing file, malformed CSV, bad schema) -> don't; it just turns
+a fast failure into a slow one and buries the real error.
 """
 
 from __future__ import annotations

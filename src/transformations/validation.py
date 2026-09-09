@@ -1,8 +1,4 @@
 """
-Validation = checking data against RULES. Closed questions, pass/fail.
-(Profiling asked the open question "what is in here?" - that came first,
- and its findings are what made these rules realistic instead of imaginary.)
-
 Two design decisions worth defending in a review:
 
 1. RULES LIVE IN config/schema.yaml, NOT IN THIS FILE.

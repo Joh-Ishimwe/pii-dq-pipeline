@@ -1,10 +1,6 @@
 """
-Profiling = describing what IS in the data (open question).
-Validation = checking data against rules (closed, pass/fail).  <- comes later.
-
-Design note: profile_dataset() returns a plain dict of FACTS.
-render_report() turns facts into text.
-Keeping them apart means the same facts can later feed a dashboard,
+profile_dataset() returns a plain dict of FACTS; render_report() turns
+facts into text. Kept apart so the same facts can later feed a dashboard,
 a JSON metrics store, or a Slack alert without rewriting the maths.
 """
 

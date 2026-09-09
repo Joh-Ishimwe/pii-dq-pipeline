@@ -9,25 +9,9 @@ THE CENTRAL TRADE-OFF, WHICH HAS NO CLEAN ANSWER:
 The engineer's job is not to find the "right" level. It is to make the trade
 VISIBLE, so the person accountable for it can choose knowingly.
 
-A vocabulary you must keep straight (people use these interchangeably; they
-are not interchangeable):
-    REDACTION       delete it.                       Irreversible. Zero utility.
-    PARTIAL MASK    show some, hide the rest.        Irreversible. Some utility.
-    GENERALIZATION  reduce precision (age -> band).  Irreversible. Good utility.
-    HASHING         one-way function + salt.         Pseudonymous. Joins survive.
-    TOKENIZATION    swap for a token, keep a vault.  Reversible with vault access.
-    ENCRYPTION      scramble with a key.             Reversible with the key.
-    ACCESS CONTROL  hide the value, restrict who     Not a data transform - an
-                    may ever see it unmasked.        organizational control.
-
-And the distinction that decides whether GDPR still applies:
-    PSEUDONYMIZED - re-identification still possible with extra information
-                    (the salt, a join key, an auxiliary dataset).
-                    -> STILL personal data. Full GDPR obligations remain.
-    ANONYMIZED    - re-identification genuinely impossible for anyone.
-                    -> outside GDPR. A very high bar, rarely reached by masking
-                       columns one at a time.
-This module produces PSEUDONYMIZED output. Saying otherwise would be false.
+This module produces PSEUDONYMIZED output, not ANONYMIZED - re-identification
+stays possible via the salt, a join key, or an auxiliary dataset. That means
+GDPR obligations still apply in full. Saying otherwise would be false.
 """
 
 from __future__ import annotations
