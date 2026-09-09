@@ -7,9 +7,17 @@ Never generate this from, or replace it with, real production data.
 Uses Faker for the underlying "clean" values (street addresses, raw phone
 digits, dates of birth, account-creation dates) so the base data is realistic
 and varied. The MESSINESS - missing values, inconsistent formats, invalid
-values, duplicates - is still injected deterministically (tied to the row
-index), because the data quality report and every downstream report quote
-exact defect counts.
+values, duplicates, typo'd domains, and impossible date relationships - is
+still injected deterministically (tied to the row index), because the data
+quality report and every downstream report quote exact defect counts.
+
+Covers all six standard DQ dimensions:
+  - Completeness  - missing values, incl. null-in-disguise ("N/A")
+  - Uniqueness    - duplicate customer_ids, duplicate full rows
+  - Validity      - invalid dates/emails, out-of-range income, age > 150
+  - Consistency   - phone/date/casing formatted differently row to row
+  - Accuracy      - typo'd-but-valid email domains; created_date < date_of_birth
+  - Timeliness    - created_date stamped after the snapshot's own extract date
 """
 
 import csv
@@ -37,6 +45,11 @@ DOB_START, DOB_END = date(1955, 1, 1), date(2015, 12, 31)     # spans ages
 CREATED_START = date(2019, 1, 1)
 CREATED_END = CREATED_START + timedelta(days=2400)
 
+# The fixed "as of" date this snapshot pretends to have been pulled on - used
+# only to inject a timeliness defect (a few created_date values stamped AFTER
+# the extract, i.e. records that couldn't exist yet at pull time).
+EXTRACT_DATE = date(2025, 8, 1)
+
 OUT = Path(__file__).resolve().parents[1] / "data" / "raw" / "customers_raw.csv"
 
 FIRST = ["john", "MARY", "Kwame", "amina", "Grace", "peter", "Chidi", "Fatou",
@@ -51,6 +64,10 @@ STATUS_POOL = (["active"] * 40 + ["inactive"] * 15 + ["suspended"] * 8
                + ["Active", "ACTIVE", "Inactive", "pending", "ACTV", ""])
 
 EMAIL_DOMAINS = ["gmail.com", "yahoo.com", "outlook.com", "company.co", "mail.rw"]
+# Typo'd versions of real providers - an accuracy defect, not a validity one:
+# these pass any format/regex check (syntactically a fine email), they're just
+# factually the wrong domain. Only a known-domain lookup would catch them.
+TYPO_DOMAINS = ["gmial.com", "gnail.com", "yaho.com", "outlok.com"]
 
 
 def messy_phone(i: int) -> str:
@@ -102,6 +119,8 @@ def messy_email(f: str, l: str, i: int) -> str:
         return ""                                           # missing
     if style == 7:
         return f"  {base}@{random.choice(EMAIL_DOMAINS).upper()}  "  # whitespace + case
+    if style == 8:
+        return f"{base}@{random.choice(TYPO_DOMAINS)}"      # accuracy: valid format, wrong domain
     return f"{base}@{random.choice(EMAIL_DOMAINS)}"
 
 
@@ -163,6 +182,18 @@ for i in range(220):
     if i % 47 == 0:
         dob_out = "1850-03-15"         # age > 150
 
+    created_out = messy_date(created, i + 2)
+    if i % 53 == 0:
+        # accuracy defect: account "created" before the customer was born.
+        # Both dates are individually valid - it's only wrong once you
+        # cross-check the two fields, which is what makes this accuracy
+        # rather than validity.
+        created_out = (dob - timedelta(days=random.randint(30, 3000))).isoformat()
+    if i % 61 == 0:
+        # timeliness defect: created_date stamped after this snapshot's own
+        # extract date - a record that couldn't exist yet as of the pull.
+        created_out = (EXTRACT_DATE + timedelta(days=random.randint(1, 400))).isoformat()
+
     rows.append({
         "customer_id": str(cid),
         "first_name": fn,
@@ -173,7 +204,7 @@ for i in range(220):
         "address": addr,
         "income": income,
         "account_status": random.choice(STATUS_POOL),
-        "created_date": messy_date(created, i + 2),
+        "created_date": created_out,
     })
 
 # 3 exact full-row duplicates (a different defect from duplicate IDs)
