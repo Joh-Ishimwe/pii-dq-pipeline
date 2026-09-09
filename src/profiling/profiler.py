@@ -325,9 +325,12 @@ def render_report(profile: dict) -> str:
         for col, c in profile["columns"].items()
         for issue in c["issues"]
     ]
+    # "none" (not personal data) and "low_risk" (a judgement call that it
+    # needs no protection) are excluded on purpose - everything else in
+    # config/schema.yaml's `pii:` taxonomy requires some form of protection.
     pii_cols = [
         c for c, v in profile["columns"].items()
-        if v["pii_class"] in ("direct", "quasi", "sensitive")
+        if v["pii_class"] not in ("none", "low_risk")
     ]
 
     add(bar)
