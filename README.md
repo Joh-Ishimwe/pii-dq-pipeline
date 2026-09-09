@@ -17,6 +17,11 @@ Exit codes: `0` ok · `1` input/config problem · `2` quality gate failed · `3`
 Individual stages can also be run alone: `scripts/run_profiling.py`,
 `run_pii_detection.py`, `run_validation.py`, `run_cleaning.py`, `run_masking.py`.
 
+`scripts/run_standard_profile.py` generates a companion EDA report using
+`ydata-profiling` (distributions, correlations, interactive exploration) -
+not part of the main pipeline, and not a replacement for `data_quality_report.txt`.
+See the docstring in that script for why both exist.
+
 ## Pipeline order
 
 ```
@@ -38,6 +43,7 @@ is, after cleaning to prove the cleaning worked.
 | `reports/masked_sample.txt` | before/after evidence — **restricted, not committed** |
 | `reports/pipeline_execution_report.txt` | run timeline, metrics, outputs |
 | `reports/reflection.md` | written analysis |
+| `reports/standard_profile.html` | generic EDA via ydata-profiling — **restricted, not committed** |
 | `data/processed/customers_cleaned.csv` | cleaned, contract-compliant |
 | `data/processed/customers_masked.csv` | pseudonymized extract for sharing |
 | `data/quarantine/duplicate_keys.csv` | rows needing a human decision |
