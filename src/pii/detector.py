@@ -137,6 +137,18 @@ MASKING_RECOMMENDATION: dict[str, str] = {
     "ip_address": "truncate final octet",
 }
 
+# Every declared class from config/schema.yaml that means "this column needs
+# protection", as opposed to "none" (not personal data) or "low_risk" (kept
+# as-is). Kept as one set so a new class only has to be added here once.
+DECLARED_PII_CLASSES = {
+    "direct", "quasi", "sensitive", "sensitive_qi", "sensitive_business", "identifier",
+}
+
+# Declared classes that make a column a quasi-identifier even when content
+# scanning can't detect it directly (e.g. income: a plain number, or a
+# category column - neither looks like anything a regex would flag).
+QI_DECLARED_CLASSES = {"quasi", "sensitive_qi"}
+
 SAMPLE_SIZE = 500  # rows sampled for content scanning; enough to be confident
 
 
@@ -200,7 +212,7 @@ def detect_pii(df: pd.DataFrame, config: dict) -> dict[str, Any]:
 
         # Confidence: how many independent signals agree?
         agreeing = sum([
-            declared in ("direct", "quasi", "sensitive"),
+            declared in DECLARED_PII_CLASSES,
             name_signal is not None,
             bool(content_signals) and any(
                 s["match_rate"] >= 50 for s in content_signals.values()
@@ -225,12 +237,13 @@ def detect_pii(df: pd.DataFrame, config: dict) -> dict[str, Any]:
         }
 
         # The interesting disagreements
-        if declared == "none" and pii_type:
+        if declared not in DECLARED_PII_CLASSES and pii_type:
             columns[col]["flags"].append(
-                "UNDECLARED PII: schema says this column is not PII, but "
-                f"detection says it holds '{pii_type}'. Schema may be wrong."
+                f"UNDECLARED PII: schema declares this column '{declared}' "
+                f"(not requiring protection), but detection says it holds "
+                f"'{pii_type}'. Schema may be wrong."
             )
-        if declared in ("direct", "quasi", "sensitive") and not content_signals:
+        if declared in DECLARED_PII_CLASSES and not content_signals:
             columns[col]["flags"].append(
                 "Declared as PII but no content pattern matched - verify manually."
             )
@@ -248,7 +261,14 @@ def detect_pii(df: pd.DataFrame, config: dict) -> dict[str, Any]:
     exposure = sum(v["populated_records"] * v["sensitivity"] for v in pii_cols.values())
     max_sensitivity = max((v["sensitivity"] for v in pii_cols.values()), default=0)
     direct_ids = [c for c, v in pii_cols.items() if v["identifiability"] == "direct"]
-    quasi_ids = [c for c, v in pii_cols.items() if v["identifiability"] == "quasi"]
+    # Union two sources of quasi-identifier status: content detection (catches
+    # what nobody declared) and the declared class (catches columns like
+    # `income` - a plain number/category that no regex will ever flag, but
+    # the schema owner knows narrows a row down when combined with others).
+    quasi_ids = sorted({
+        c for c, v in columns.items()
+        if v["identifiability"] == "quasi" or v["declared"] in QI_DECLARED_CLASSES
+    })
 
     # Can a row be pinned to one human? Test the classic quasi-identifier combo.
     reident = _reidentification_test(df)
@@ -347,10 +367,10 @@ def render_report(r: dict) -> str:
     add(bar)
     add("1. DETECTION MATRIX")
     add(bar)
-    add(f"  {'column':<16}{'declared':<14}{'detected':<18}{'conf':<9}{'sens':<6}records")
-    add("  " + "-" * 74)
+    add(f"  {'column':<16}{'declared':<20}{'detected':<18}{'conf':<9}{'sens':<6}records")
+    add("  " + "-" * 80)
     for col, v in r["columns"].items():
-        add(f"  {col:<16}{v['declared']:<14}{str(v['pii_type'] or '-'):<18}"
+        add(f"  {col:<16}{v['declared']:<20}{str(v['pii_type'] or '-'):<18}"
             f"{v['confidence']:<9}{v['sensitivity']:<6}{v['populated_records']}")
     add("")
     add("  declared = what config/schema.yaml claims")
