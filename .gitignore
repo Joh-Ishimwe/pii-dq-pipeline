@@ -14,6 +14,9 @@ venv/
 .env
 .ipynb_checkpoints/
 
+# playground notebook - outputs contain raw, unmasked PII once run
+notebooks/
+
 # masked_sample.txt contains UNMASKED example values as evidence - restricted
 reports/masked_sample.txt
 data/quarantine/
