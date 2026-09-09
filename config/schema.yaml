@@ -21,7 +21,8 @@ columns:
     required: true
     unique: true
     min: 1
-    pii: none
+    pii: identifier     # not personal data by itself, but must be pseudonymized
+                         # so joins survive across extracts without exposing the real key
 
   first_name:
     type: string
@@ -71,19 +72,21 @@ columns:
     required: false
     min: 0
     max: 10000000
-    pii: sensitive      # financial data - high breach impact
+    pii: sensitive_qi    # high breach impact AND, combined with dob/status,
+                          # narrows a row down to one person - counted both ways
 
   account_status:
     type: category
     required: true
     allowed: [active, inactive, suspended]
-    pii: none
+    pii: sensitive_business   # not personal data on its own, but reveals account
+                              # standing/eligibility - restrict access, don't publish it
 
   created_date:
     type: date
     required: true
     date_format: "%Y-%m-%d"
-    pii: none
+    pii: low_risk        # operational metadata, not about the person - kept as-is
 
 # Values that LOOK like data but mean "missing".
 # Profiling must count these as missing, or completeness is overstated.
@@ -160,6 +163,8 @@ masking:
   date_of_birth: {method: year_only}
   address:       {method: redact,        label: "[MASKED ADDRESS]"}
   income:        {method: band,          width: 25000}
+  account_status: {method: access_control}   # not shared at all - restricted to
+                                              # systems with a legitimate need
   customer_id:   {method: pseudonymize}   # salted hash: joins survive, id does not
 
 # The salt makes the hash un-guessable. In production this comes from a secrets
