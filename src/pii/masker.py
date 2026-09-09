@@ -17,6 +17,8 @@ are not interchangeable):
     HASHING         one-way function + salt.         Pseudonymous. Joins survive.
     TOKENIZATION    swap for a token, keep a vault.  Reversible with vault access.
     ENCRYPTION      scramble with a key.             Reversible with the key.
+    ACCESS CONTROL  hide the value, restrict who     Not a data transform - an
+                    may ever see it unmasked.        organizational control.
 
 And the distinction that decides whether GDPR still applies:
     PSEUDONYMIZED - re-identification still possible with extra information
@@ -53,6 +55,8 @@ UTILITY_COST = {
     "redact": "ALL geographic analysis lost - region, city, delivery, catchment",
     "band": "exact figures lost; distribution and segmentation survive",
     "pseudonymize": "joins to other masked extracts survive; the real id does not",
+    "access_control": "no status analysis in this extract; restricted to systems "
+                       "with a legitimate, authorized need",
 }
 
 
@@ -123,6 +127,9 @@ class Masker:
             "redact": lambda x: self._redact(x, params.get("label", "[REDACTED]")),
             "band": lambda x: self._band(x, params.get("width", 25000)),
             "pseudonymize": self._pseudonymize,
+            # Access control isn't a data transform - the value is fully hidden
+            # here because this extract has no way to enforce WHO may see it.
+            "access_control": lambda x: self._redact(x, "[ACCESS CONTROLLED]"),
         }[method]
         return fn(value)
 
