@@ -14,13 +14,17 @@ python scripts/run_pipeline.py          # the whole thing
 
 Exit codes: `0` ok · `1` input/config problem · `2` quality gate failed · `3` bug.
 
-Individual stages can also be run alone: `scripts/run_profiling.py`,
-`run_pii_detection.py`, `run_validation.py`, `run_cleaning.py`, `run_masking.py`.
+`scripts/run_pipeline.py` produces every required deliverable (all
+`reports/*.txt` and `data/processed/*.csv`) in one run. There are no
+separate per-stage scripts for cleaning/validation/masking/PII detection;
+each stage is a module under `src/` (`src/profiling`, `src/pii`,
+`src/transformations`), unit-tested on its own and orchestrated by
+`src/pipelines/dq_pipeline.py`.
 
-`scripts/run_standard_profile.py` generates a companion EDA report using
-`ydata-profiling` (distributions, correlations, interactive exploration) -
-not part of the main pipeline, and not a replacement for `data_quality_report.txt`.
-See the docstring in that script for why both exist.
+`scripts/run_profile.py` is a separate, optional EDA entry point: it writes
+`reports/data_quality_report.txt` (same required Part 1 report) plus
+`reports/standard_profile.html`, a generic `ydata-profiling` exploration
+report. The HTML contains unmasked PII - never commit or share it.
 
 ## Pipeline order
 
@@ -57,11 +61,4 @@ is, after cleaning to prove the cleaning worked.
 strategy, masking rules and the ambiguous-date policy. Changing a rule is a
 config edit, not a code change.
 
-## Warnings
 
-- `data/raw/` and `reports/masked_sample.txt` contain personal data and are
-  gitignored. Keep them that way.
-- `customers_masked.csv` is **pseudonymized, not anonymized** — 56.5% of rows
-  remain uniquely identifiable on quasi-identifiers. GDPR still applies.
-- Without `PII_PSEUDONYM_SALT` set, pseudonyms are reversible by brute force.
-  The pipeline warns; do not ignore it.

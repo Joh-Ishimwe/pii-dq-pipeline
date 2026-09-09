@@ -354,7 +354,7 @@ def render_report(profile: dict) -> str:
     add("")
     add("  For value distributions, correlations and interactive exploration -")
     add("  the generic statistics no contract check can express - see")
-    add("  reports/standard_profile.html (scripts/run_standard_profile.py).")
+    add("  reports/standard_profile.html (scripts/run_profile.py).")
     add("")
 
     add(bar)
